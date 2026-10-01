@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>JSG Draw Registration</title>
+  <script src="https://net/npm/@supabase/supabase-jsscript>
+</head>
+<body>
+
+<h1>🎉 JSG Annual Dinner</h1>
+
+<h2>Register for Lucky Draw</h2>
+
+<input id="name" placeholder="Full Name">
+<br><br>
+
+<input id="employeeId" placeholder="Employee ID">
+<br><br>
+
+<button onclick="register()">Join Draw</button>
+
+<p id="message"></p>
+
+<script>
+const supabaseUrl = 'https://cifefakczitwuajqanfi.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNpZmVmYWtjeml0d3VhanFhbmZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA4NDgzNTEsImV4cCI6MjEwNjQyNDM1MX0.RJiX-OzlCM9EtrCKdPfDzu_NjdPiXGdwQ0yyvOGXBh0';
+
+const supabaseClient = supabase.createClient(
+  supabaseUrl,
+  supabaseKey
+);
+
+async function register() {
+
+  const name = document.getElementById('name').value;
+  const employeeId = document.getElementById('employeeId').value;
+
+  if (!name || !employeeId) {
+    document.getElementById('message').innerText =
+      'Please fill all fields';
+    return;
+  }
+
+  const { data: existing } = await supabaseClient
+    .from('participants')
+    .select('id')
+    .eq('employee_id', employeeId);
+
+  if (existing && existing.length > 0) {
+    document.getElementById('message').innerText =
+      'Employee ID already registered';
+    return;
+  }
+
+  const { error } = await supabaseClient
+    .from('participants')
+    .insert([
+      {
+        name: name,
+        employee_id: employeeId
+      }
+    ]);
+
+  if (error) {
+    document.getElementById('message').innerText =
+      error.message;
+    return;
+  }
+
+  document.getElementById('message').innerText =
+    'Registration successful!';
+}
+</script>
+
+</body>
+</html>
