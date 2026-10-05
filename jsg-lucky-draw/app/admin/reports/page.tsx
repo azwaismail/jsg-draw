@@ -13,21 +13,21 @@ export default function ReportsHomePage() {
 
       <div className="space-y-4">
 
-        /admin/reports/winners
-          🏆 Winners Report
-        </Link>
+        <Link href="/admin/reports/winners">
+      🏆 Winners Report
+    </Link>
 
-        /admin/reports/unclaimed
-          🎁 Unclaimed Prize Report
-        </Link>
+    <Link href="/admin/reports/unclaimed">
+      🎁 Unclaimed Prize Report
+    </Link>
 
-        /admin/reports/attendance
-          👥 Attendance But Did Not Draw
-        </Link>
+    <Link href="/admin/reports/attendance"> 
+      👥 Attendance Not Drawn
+    </Link>
 
-        /admin/claims
-          ✅ Prize Claims
-        </Link>
+    <Link href="/admin/claims">
+      ✅ Prize Claims
+    </Link>
 
       </div>
 
