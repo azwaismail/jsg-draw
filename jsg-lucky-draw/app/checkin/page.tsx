@@ -7,16 +7,19 @@ export default function CheckInPage() {
   const [staffId, setStaffId] = useState('')
   const [staffDOB, setdob] = useState('')
   const [message, setMessage] = useState('')
-
   const [staff, setStaff] = useState<any>(null)
   const [verified, setVerified] = useState(false)
-  
   const [luckyCode, setLuckyCode] = useState('')
-
   const [attendanceOpen, setAttendanceOpen] = useState(true)
 
   useEffect(() => {
+  loadEventControl()
+
+  const interval = setInterval(() => {
     loadEventControl()
+  }, 3000)
+
+  return () => clearInterval(interval)
   }, [])
 
     async function loadEventControl() {
@@ -25,12 +28,10 @@ export default function CheckInPage() {
             .select('*')
             .eq('id', 1)
             .single()
-        
-        console.log('EVENT CONTROL', data)
-        console.log('EVENT ERROR', error)
 
         if (error) {
-            return
+          setMessage('Unable to load event settings')
+          return
         }
 
         setAttendanceOpen(data.attendance_open)
@@ -50,9 +51,6 @@ export default function CheckInPage() {
       .eq('staff_id', staffId.trim())
       .eq('dob', staffDOB.trim())
       .single()
-
-    console.log('DATA', data)
-    console.log('ERROR', error)
 
     if (error || !data) {
       setMessage('Invalid Staff ID or Date of Birth')
@@ -83,6 +81,20 @@ export default function CheckInPage() {
   }
 
   async function confirmAttendance() {
+    const { data: control } =
+  await supabase
+    .from('event_control')
+    .select('attendance_open')
+    .eq('id', 1)
+    .single()
+
+  if (!control?.attendance_open) {
+
+  setMessage(
+    'Attendance check-in has closed'
+  )
+  return
+  }
 
   const { data: existing} = await supabase
     .from('attendance')

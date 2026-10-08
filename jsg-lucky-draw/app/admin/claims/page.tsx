@@ -1,5 +1,6 @@
 'use client'
 
+import AdminGuard from '@/components/AdminGuard'
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 
@@ -131,7 +132,7 @@ export default function ClaimsPage() {
   }
 
   return (
-
+    <AdminGuard>
     <main className="min-h-screen p-6 max-w-xl mx-auto">
 
       <h1 className="text-3xl font-bold mb-6">
@@ -249,6 +250,6 @@ export default function ClaimsPage() {
       )}
 
     </main>
-
+    </AdminGuard>
   )
 }

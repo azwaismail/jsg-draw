@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import AdminGuard from '@/components/AdminGuard'
 
 export default function WinnersReport() {
 
@@ -113,7 +114,7 @@ function exportCsv() {
 }
 
   return (
-
+    <AdminGuard>
     <main className="min-h-screen p-6 max-w-7xl mx-auto">
 
       <h1 className="text-3xl font-bold mb-6">
@@ -235,6 +236,6 @@ function exportCsv() {
       </table>
 
     </main>
-
+    </AdminGuard>
   )
 }

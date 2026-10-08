@@ -7,15 +7,23 @@ export default function DrawPage() {
 
   const [staffId, setStaffId] = useState('')
   const [staffDOB, setStaffDOB] = useState('')
-
   const [message, setMessage] = useState('')
   const [rewardCode, setRewardCode] = useState('')
-
-  const [drawLobbyOpen, setDrawLobbyOpen] =
-    useState(false)
-
+  const [drawLobbyOpen, setDrawLobbyOpen] = useState(false)
+  const [alreadyJoined, setAlreadyJoined] = useState(false)
+  const [assignmentCompleted, setAssignmentCompleted] = useState(false)
+  const [revealOpen, setRevealOpen] = useState(false)
+  const [isRevealing, setIsRevealing] = useState(false)
+  
   useEffect(() => {
-    loadControl()
+  loadControl()
+
+  const interval =
+    setInterval(() => {
+      loadControl()
+    }, 3000)
+
+  return () => clearInterval(interval)
   }, [])
 
   async function loadControl() {
@@ -26,18 +34,39 @@ export default function DrawPage() {
       .eq('id', 1)
       .single()
 
-    if (error) {
-      console.log(error)
+    if (error || !data) {
+      setDrawLobbyOpen(false)
       return
     }
+    console.log(
+  'CONTROL',
+  data
+)
 
     setDrawLobbyOpen(data.draw_lobby_open)
+    setAssignmentCompleted(data.assignment_completed)
+    setRevealOpen(data.reveal_open)
   }
 
-  async function drawPrize() {
+  async function joinLobby() {
+
+    if (!drawLobbyOpen) {
+    setMessage(
+      'Draw lobby is closed'
+    )
+    return
+    }
+
+    if (assignmentCompleted) {
+    setMessage(
+      'Please wait for the lucky draw session to begin.'
+    )
+    return
+    }
 
     setMessage('Verifying...')
     setRewardCode('')
+    setAlreadyJoined(false)
 
     // Verify Employee
 
@@ -72,158 +101,139 @@ export default function DrawPage() {
       return
     }
 
-    // Already Drawn
+    if (attendance.joined_draw_lobby) {
 
-    if (attendance.prize_code) {
+    setAlreadyJoined(true)
 
-      setRewardCode(
-        attendance.prize_code
-      )
+    setMessage(
+      '✅ You have already joined the draw lobby'
+    )
 
-      setMessage(
-        '✅ Prize Already Drawn'
-      )
-
-      return
+    return
     }
 
-    // =====================================================
-    // STEP 1 - CHECK PREASSIGNED PRIZE
-    // =====================================================
-
-    const { data: preassignedPrize } =
+    const { error } =
       await supabase
-        .from('prizes')
-        .select('*')
-        .eq(
-          'assigned_staff_id',
-          staff.staff_id
-        )
-        .is('winner_staff_id', null)
-        .maybeSingle()
-
-    if (preassignedPrize) {
-
-      await supabase
-        .from('prizes')
-        .update({
-          winner_staff_id:
-            staff.staff_id
-        })
-        .eq(
-          'prize_code',
-          preassignedPrize.prize_code
-        )
-
-      await supabase
-        .from('attendance')
-        .update({
-          joined_draw_lobby: true,
-          draw_join_time:
-            new Date().toISOString(),
-          prize_code:
-            preassignedPrize.prize_code,
-          prize_assigned: true
-        })
-        .eq(
-          'staff_id',
-          staff.staff_id
-        )
-
-      setRewardCode(
-        preassignedPrize.prize_code
-      )
-
-      setMessage(
-        '🎉 Congratulations'
-      )
-
-      return
-    }
-
-    // =====================================================
-    // STEP 2 - RANDOM PRIZE
-    // =====================================================
-
-    const { data: randomPrizes } =
-      await supabase
-        .from('prizes')
-        .select('*')
-        .eq('prize_type', 'RANDOM')
-        .is('winner_staff_id', null)
-
-    if (
-      !randomPrizes ||
-      randomPrizes.length === 0
-    ) {
-      setMessage(
-        'No prizes remaining'
-      )
-      return
-    }
-
-    const selectedPrize =
-      randomPrizes[
-        Math.floor(
-          Math.random() *
-          randomPrizes.length
-        )
-      ]
-
-    await supabase
-      .from('prizes')
-      .update({
-        winner_staff_id:
-          staff.staff_id
-      })
-      .eq(
-        'prize_code',
-        selectedPrize.prize_code
-      )
-
-    await supabase
       .from('attendance')
       .update({
-        joined_draw_lobby: true,
-        draw_join_time:
-          new Date().toISOString(),
-        prize_code:
-          selectedPrize.prize_code,
-        prize_assigned: true
+      joined_draw_lobby: true,
+      draw_join_time:
+        new Date().toISOString()
       })
       .eq(
         'staff_id',
         staff.staff_id
       )
 
+    if (error) {
+      setMessage(
+      'Unable to join draw lobby'
+      )
+
+    return
+    }
+    setAlreadyJoined(true)
+    setMessage(
+      '✅ Successfully joined the draw lobby'
+    )
+  }
+
+  async function revealPrize() {
+
+  setMessage('Verifying...')
+
+  const { data: staff, error } =
+    await supabase
+      .from('staff_master')
+      .select('*')
+      .eq('staff_id', staffId.trim())
+      .eq('dob', staffDOB.trim())
+      .single()
+
+  if (error || !staff) {
+
+    setMessage(
+      'Invalid Staff ID or Date of Birth'
+    )
+
+    return
+  }
+
+  const { data: attendance } =
+    await supabase
+      .from('attendance')
+      .select('*')
+      .eq(
+        'staff_id',
+        staff.staff_id
+      )
+      .single()
+
+  if (
+    !attendance ||
+    !attendance.joined_draw_lobby
+  ) {
+
+    setMessage(
+      'You did not join the draw lobby'
+    )
+
+    return
+  }
+
+  setIsRevealing(true)
+
+  const interval = setInterval(() => {
+
+    const randomCode =
+      'P' +
+      String(
+        Math.floor(
+          Math.random() * 999
+        )
+      ).padStart(3, '0')
+
+    setRewardCode(randomCode)
+
+  }, 100)
+
+  setTimeout(() => {
+
+    clearInterval(interval)
+
     setRewardCode(
-      selectedPrize.prize_code
+      attendance.prize_code
     )
 
     setMessage(
       '🎉 Congratulations'
     )
-  }
 
-  if (!drawLobbyOpen) {
-    return (
-      <main className="min-h-screen flex items-center justify-center">
+    setIsRevealing(false)
 
-        <div className="text-center">
+  }, 3000)
+}
 
-          <h1 className="text-4xl font-bold text-red-600 mb-4">
-            Draw Lobby Closed
-          </h1>
+  if (!drawLobbyOpen && !revealOpen) {
 
-          <p>
-            Please wait for the lucky draw session.
-          </p>
+  return (
+    <main className="min-h-screen flex items-center justify-center">
 
-        </div>
+      <div className="text-center">
 
-      </main>
-    )
-  }
+        <h1 className="text-4xl font-bold text-red-600 mb-4">
+          Draw Lobby Closed
+        </h1>
+
+        <p>
+          Please wait for the lucky draw session to begin.
+        </p>
+
+      </div>
+
+    </main>
+  )
+}
 
   return (
     <main className="min-h-screen p-6 max-w-md mx-auto">
@@ -250,31 +260,82 @@ export default function DrawPage() {
         }
       />
 
+      {drawLobbyOpen &&
+      !assignmentCompleted &&
+      !alreadyJoined && (
+
       <button
-        onClick={drawPrize}
+        onClick={joinLobby}
         className="bg-blue-600 text-white px-4 py-2 rounded"
       >
-        Draw Prize
+        Join Draw Lobby
       </button>
+      )}
 
       <p className="mt-4 font-semibold">
         {message}
       </p>
+      
+      {alreadyJoined && !revealOpen && (
 
-      {rewardCode && (
-        <div className="mt-8 text-center">
+      <div className="mt-6 text-center">
+      <p className="text-lg">
+        You are now in the draw lobby.
+      </p>
 
-          <p className="text-lg text-gray-600">
-            Your Mystery Reward Code
-          </p>
-
-          <div className="text-6xl font-bold text-green-600 mt-2">
-            {rewardCode}
-          </div>
-
-        </div>
+      <p className="text-gray-500 mt-2">
+        Please wait for the lucky draw session to begin.
+      </p>
+      </div>
       )}
 
+      {assignmentCompleted && revealOpen && (
+      <button
+        onClick={revealPrize}
+        className="bg-purple-600 text-white px-6 py-3 rounded mt-6 w-full"
+      >
+      🎁 DRAW NOW
+      </button>
+      )}
+
+      {rewardCode && (
+
+  <div className="mt-8 text-center">
+
+    {isRevealing && (
+
+      <p className="text-xl font-bold text-orange-600">
+
+        🎰 Drawing Your Prize...
+
+      </p>
+
+    )}
+
+    <p className="text-lg text-gray-600 mt-4">
+
+      Your Mystery Reward Code
+
+    </p>
+
+    <div
+      className={`
+        text-6xl
+        font-bold
+        mt-2
+        ${
+          isRevealing
+            ? 'text-orange-500'
+            : 'text-green-600'
+        }
+      `}
+    >
+      {rewardCode}
+    </div>
+
+  </div>
+
+)}
     </main>
   )
 }

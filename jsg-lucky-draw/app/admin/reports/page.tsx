@@ -1,10 +1,11 @@
 'use client'
+import AdminGuard from '@/components/AdminGuard'
 
 import Link from 'next/link'
 
 export default function ReportsHomePage() {
 
-  return (
+  return ( <AdminGuard>
     <main className="min-h-screen p-6 max-w-3xl mx-auto">
 
       <h1 className="text-3xl font-bold mb-8">
@@ -32,5 +33,6 @@ export default function ReportsHomePage() {
       </div>
 
     </main>
+    </AdminGuard>
   )
 }

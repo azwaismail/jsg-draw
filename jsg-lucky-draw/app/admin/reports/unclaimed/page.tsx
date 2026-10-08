@@ -1,5 +1,6 @@
 'use client'
 
+import AdminGuard from '@/components/AdminGuard'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 
@@ -113,6 +114,7 @@ export default function UnclaimedReport() {
 }
 
   return (
+    <AdminGuard>
     <main className="min-h-screen p-6 max-w-6xl mx-auto">
 
       <h1 className="text-3xl font-bold mb-6">
@@ -201,5 +203,6 @@ export default function UnclaimedReport() {
       </table>
 
     </main>
+    </AdminGuard>
   )
 }

@@ -1,5 +1,6 @@
 'use client'
 
+import AdminGuard from '@/components/AdminGuard'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 
@@ -20,7 +21,7 @@ export default function AttendanceReport() {
         .is('prize_code', null)
 
     if (error) {
-      console.log(error)
+      setStaff([])
       return
     }
 
@@ -108,7 +109,7 @@ export default function AttendanceReport() {
 }
 
   return (
-
+    <AdminGuard>
     <main className="min-h-screen p-6 max-w-7xl mx-auto">
 
       <h1 className="text-3xl font-bold mb-6">
@@ -196,6 +197,6 @@ export default function AttendanceReport() {
       </table>
 
     </main>
-
+    </AdminGuard>
   )
 }

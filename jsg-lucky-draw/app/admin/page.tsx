@@ -1,5 +1,6 @@
 'use client'
 
+import AdminGuard from '@/components/AdminGuard'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
@@ -8,32 +9,31 @@ export default function AdminPage() {
 
   const [message, setMessage] = useState('')
 
-  const [attendanceOpen, setAttendanceOpen] =
-    useState(false)
+  const [attendanceOpen, setAttendanceOpen] = useState(false)
 
-  const [drawLobbyOpen, setDrawLobbyOpen] =
-    useState(false)
+  const [drawLobbyOpen, setDrawLobbyOpen] = useState(false)
 
-  const [totalStaff, setTotalStaff] =
-    useState(0)
+  const [totalStaff, setTotalStaff] = useState(0)
 
-  const [checkedInCount, setCheckedInCount] =
-    useState(0)
+  const [checkedInCount, setCheckedInCount] = useState(0)
 
-  const [drawnCount, setDrawnCount] =
-    useState(0)
+  const [drawnCount, setDrawnCount] = useState(0)
 
-  const [remainingToDraw, setRemainingToDraw] =
-    useState(0)
+  const [remainingToDraw, setRemainingToDraw] = useState(0)
 
-  const [remainingPrizes, setRemainingPrizes] =
-    useState(0)
+  const [remainingPrizes, setRemainingPrizes] = useState(0)
 
-  const [claimedCount, setClaimedCount] =
-  useState(0)
+  const [claimedCount, setClaimedCount] = useState(0)
 
-  const [unclaimedCount, setUnclaimedCount] =
-  useState(0)
+  const [unclaimedCount, setUnclaimedCount] = useState(0)
+
+  const [joinedLobbyCount, setJoinedLobbyCount] = useState(0)
+
+  const [assignmentCompleted, setAssignmentCompleted] = useState(false)
+
+  const [revealOpen, setRevealOpen] = useState(false)
+
+  const [countdownActive, setCountdownActive] = useState(false)
 
   useEffect(() => {
     loadDashboard()
@@ -56,6 +56,9 @@ export default function AdminPage() {
     if (control) {
       setAttendanceOpen(control.attendance_open)
       setDrawLobbyOpen(control.draw_lobby_open)
+      setAssignmentCompleted(control.assignment_completed)
+      setRevealOpen(control.reveal_open)
+      setCountdownActive(control.countdown_active)
     }
 
     const { count: totalStaffCount } =
@@ -126,6 +129,20 @@ export default function AdminPage() {
         .eq('claimed', false)
 
     setUnclaimedCount(unclaimed || 0)
+
+    const { count: lobbyCount } =
+      await supabase
+        .from('attendance')
+        .select('*', {
+          count: 'exact',
+          head: true
+        })
+        .eq(
+          'joined_draw_lobby',
+        true
+        )
+
+    setJoinedLobbyCount(lobbyCount || 0)
   }
 
   async function openAttendance() {
@@ -185,6 +202,174 @@ export default function AdminPage() {
     await loadDashboard()
   }
 
+  async function assignAllPrizes() {
+  
+    const { data: control } =
+      await supabase
+        .from('event_control')
+        .select('assignment_completed')
+        .eq('id', 1)
+        .single()
+
+    if (
+      control?.assignment_completed
+    ) {
+      setMessage(
+        'Prizes already assigned'
+      )
+    return
+    }
+  
+  // Get all lobby participants
+
+  const { data: participants } =
+    await supabase
+      .from('attendance')
+      .select('*')
+      .eq('joined_draw_lobby', true)
+      .is('prize_code', null)
+
+  if (!participants || participants.length === 0) {
+    return
+  }
+
+  // PREASSIGNED PRIZES
+
+  const { data: preassignedPrizes } =
+    await supabase
+      .from('prizes')
+      .select('*')
+      .eq('prize_type', 'PREASSIGNED')
+      .is('winner_staff_id', null)
+
+  const assignedStaffIds = new Set<string>()
+
+  for (const prize of preassignedPrizes || []) {
+
+    const matchedParticipant =
+      participants.find(
+        p =>
+          p.staff_id ===
+          prize.assigned_staff_id
+      )
+
+    if (!matchedParticipant) {
+      continue
+    }
+
+    await supabase
+      .from('prizes')
+      .update({
+        winner_staff_id:
+          matchedParticipant.staff_id
+      })
+      .eq(
+        'prize_code',
+        prize.prize_code
+      )
+
+    await supabase
+      .from('attendance')
+      .update({
+        prize_code:
+          prize.prize_code,
+        prize_assigned: true
+      })
+      .eq(
+        'staff_id',
+        matchedParticipant.staff_id
+      )
+
+    assignedStaffIds.add(
+      matchedParticipant.staff_id
+    )
+  }
+
+  // REMAINING PARTICIPANTS
+
+  const remainingParticipants =
+    participants.filter(
+      p =>
+        !assignedStaffIds.has(
+          p.staff_id
+        )
+    )
+
+  // REMAINING RANDOM PRIZES
+
+  const { data: randomPrizes } =
+    await supabase
+      .from('prizes')
+      .select('*')
+      .eq('prize_type', 'RANDOM')
+      .is('winner_staff_id', null)
+
+  if (!randomPrizes) {
+    return
+  }
+
+  // Shuffle Participants
+
+  const shuffledParticipants =
+    [...remainingParticipants]
+      .sort(
+        () => Math.random() - 0.5
+      )
+
+  // Shuffle Prizes
+
+  const shuffledPrizes =
+    [...randomPrizes]
+      .sort(
+        () => Math.random() - 0.5
+      )
+
+  const count =
+    Math.min(
+      shuffledParticipants.length,
+      shuffledPrizes.length
+    )
+
+  for (let i = 0; i < count; i++) {
+
+    const participant =
+      shuffledParticipants[i]
+
+    const prize =
+      shuffledPrizes[i]
+
+    await supabase
+      .from('prizes')
+      .update({
+        winner_staff_id:
+          participant.staff_id
+      })
+      .eq(
+        'prize_code',
+        prize.prize_code
+      )
+
+    await supabase
+      .from('attendance')
+      .update({
+        prize_code:
+          prize.prize_code,
+        prize_assigned: true
+      })
+      .eq(
+        'staff_id',
+        participant.staff_id
+      )
+  }
+
+  await supabase
+    .from('event_control')
+    .update({
+      assignment_completed: true
+    })
+    .eq('id', 1)
+}
+
   async function closeDrawLobby() {
 
     const { error } = await supabase
@@ -204,6 +389,59 @@ export default function AdminPage() {
     await loadDashboard()
   }
 
+  async function openReveal() {
+    if (!assignmentCompleted) {
+      setMessage(
+        'Please assign prizes first.'
+      )
+      return
+    }
+
+    const { error } =
+      await supabase
+        .from('event_control')
+        .update({
+          reveal_open: true,
+          countdown_active: false
+        })
+        .eq('id', 1)
+
+    if (error) {
+      setMessage(error.message)
+      return
+    }
+
+    setMessage(
+      '✅ Reveal Opened'
+    )
+
+    await loadDashboard()
+  }
+
+  async function startCountdown() {
+
+    const { error } = 
+    await supabase
+      .from('event_control')
+      .update({
+        countdown_active: true,
+        countdown_value: 10,
+        reveal_open: false
+      })
+      .eq('id', 1)
+
+    if (error) {
+      setMessage(error.message)
+      return
+    }
+
+    setMessage(
+      '✅ Countdown Started'
+    )
+
+    await loadDashboard()
+  }
+
   async function resetEvent() {
 
     const password = prompt(
@@ -212,57 +450,76 @@ export default function AdminPage() {
 
     if (password !== 'JSG2026RESET') {
 
-alert('Incorrect Password')
+    alert('Incorrect Password')
 
-return
-}
+    return
+    }
 
-const confirmed = window.confirm(
-'This will erase all attendance and draw records. Continue?'
-)
+    const confirmed = window.confirm(
+      'This will erase all attendance and draw records. Continue?'
+    )
 
-if (!confirmed) {
-return
-}
+    if (!confirmed) {
+    return
+    }
 
-const { error: attendanceError } =
-await supabase
-.from('attendance')
-.delete()
-.neq('staff_id', '')
+    const { error: attendanceError } =
+      await supabase
+        .from('attendance')
+        .delete()
+        .neq('staff_id', '')
 
-if (attendanceError) {
-setMessage(attendanceError.message)
-return
-}
+    if (attendanceError) {
+    setMessage(attendanceError.message)
+    return
+    }
 
-const { error: prizeError } =
-await supabase
-.from('prizes')
-.update({
-winner_staff_id: null,
-revealed: false,
-claimed: false
-})
-.not('prize_code', 'is', null)
+    const { error: prizeError } =
+      await supabase
+        .from('prizes')
+        .update({
+          winner_staff_id: null,
+          revealed: false,
+          claimed: false
+        })
+        .not('prize_code', 'is', null)
 
-if (prizeError) {
-setMessage(prizeError.message)
-return
-}
+    if (prizeError) {
+    setMessage(prizeError.message)
+    return
+    }
 
-setMessage(
-'✅ Event Reset Successful'
-)
+    const { error: controlError } =
+      await supabase
+        .from('event_control')
+        .update({
+          attendance_open: false,
+          draw_lobby_open: false,
+          assignment_completed: false,
+          reveal_open: false,
+          countdown_active: false,
+          countdown_value: 0
+        })
+        .eq('id', 1)
 
-await loadDashboard()
-}
+    if (controlError) {
+    setMessage(controlError.message)
+    return
+    }
+
+    setMessage(
+      '✅ Event Reset Successful'
+    )
+
+    await loadDashboard()
+  }
 
 return (
+  <AdminGuard>
 <main className="min-h-screen p-6 max-w-xl mx-auto">
 
 <h1 className="text-3xl font-bold mb-6">
-JSG Lucky Draw Admin
+ONE1JSG Lucky Draw Admin
 </h1>
 
 <div className="bg-gray-100 rounded-lg p-4 mb-6">
@@ -301,6 +558,33 @@ drawLobbyOpen
 </span>
 </p>
 
+<p className="mt-2">
+  Assignment Status:{' '}
+  <strong>
+    {assignmentCompleted
+      ? 'COMPLETED'
+      : 'NOT STARTED'}
+  </strong>
+</p>
+
+<p className="mt-2">
+  Countdown:{' '}
+  <strong>
+    {countdownActive
+      ? 'ACTIVE'
+      : 'INACTIVE'}
+  </strong>
+</p>
+
+<p className="mt-2">
+  Reveal:{' '}
+  <strong>
+    {revealOpen
+      ? 'OPEN'
+      : 'CLOSED'}
+  </strong>
+</p>
+
 <hr className="my-4" />
 
 <p>
@@ -312,6 +596,13 @@ Checked In:
 {' / '}
 <strong>
 {totalStaff}
+</strong>
+</p>
+
+<p className="mt-2">
+Draw Lobby Joined:{' '}
+<strong>
+{joinedLobbyCount}
 </strong>
 </p>
 
@@ -387,6 +678,27 @@ className="bg-orange-600 text-white px-4 py-2 rounded w-full"
 Close Draw Lobby
 </button>
 
+<button
+  onClick={assignAllPrizes}
+  className="bg-purple-600 text-white px-4 py-2 rounded w-full"
+>
+  Assign Prizes
+</button>
+
+<button
+  onClick={openReveal}
+  className="bg-green-700 text-white px-4 py-2 rounded w-full"
+>
+  Open Reveal
+</button>
+
+<button
+  onClick={startCountdown}
+  className="bg-indigo-600 text-white px-4 py-2 rounded w-full"
+>
+  Start Countdown
+</button>
+
 </div>
 
 <div className="mt-10">
@@ -433,5 +745,6 @@ Close Draw Lobby
 </p>
 
 </main>
+</AdminGuard>
 )
 }
