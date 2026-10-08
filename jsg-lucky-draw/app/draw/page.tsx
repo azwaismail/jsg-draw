@@ -38,11 +38,7 @@ export default function DrawPage() {
       setDrawLobbyOpen(false)
       return
     }
-    console.log(
-  'CONTROL',
-  data
-)
-
+    
     setDrawLobbyOpen(data.draw_lobby_open)
     setAssignmentCompleted(data.assignment_completed)
     setRevealOpen(data.reveal_open)
